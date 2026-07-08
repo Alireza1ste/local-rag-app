@@ -1,0 +1,8 @@
+gradio>=4.0.0
+python-dotenv
+langchain-core
+langchain-community
+langchain-qdrant
+langchain-ollama
+pypdf
+fastembed

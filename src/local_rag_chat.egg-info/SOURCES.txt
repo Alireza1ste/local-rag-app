@@ -1,0 +1,15 @@
+README.md
+pyproject.toml
+src/local_rag_chat/__init__.py
+src/local_rag_chat/app.py
+src/local_rag_chat/document_processor.py
+src/local_rag_chat/models.py
+src/local_rag_chat/rag_chain.py
+src/local_rag_chat/ui.py
+src/local_rag_chat/utils.py
+src/local_rag_chat.egg-info/PKG-INFO
+src/local_rag_chat.egg-info/SOURCES.txt
+src/local_rag_chat.egg-info/dependency_links.txt
+src/local_rag_chat.egg-info/entry_points.txt
+src/local_rag_chat.egg-info/requires.txt
+src/local_rag_chat.egg-info/top_level.txt

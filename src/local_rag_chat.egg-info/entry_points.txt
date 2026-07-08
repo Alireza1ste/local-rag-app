@@ -1,0 +1,2 @@
+[console_scripts]
+local-rag-chat = local_rag_chat.app:main

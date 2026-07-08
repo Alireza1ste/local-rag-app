@@ -1,0 +1,31 @@
+[build-system]
+requires = ["setuptools>=61.0.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "local-rag-chat"
+version = "0.2.1"
+authors = [
+    { name="Your Name", email="your.email@example.com" }
+]
+description = "A completely local RAG application using Gradio, LangChain, Qdrant, and Ollama"
+readme = "README.md"
+requires-python = ">=3.9"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
+dependencies = [
+    "gradio>=4.0.0",
+    "python-dotenv",
+    "langchain-core",
+    "langchain-community",
+    "langchain-qdrant",
+    "langchain-ollama",
+    "pypdf",
+    "fastembed",
+]
+
+[project.scripts]
+local-rag-chat = "local_rag_chat.app:main"
