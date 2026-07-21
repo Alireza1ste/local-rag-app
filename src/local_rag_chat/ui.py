@@ -180,8 +180,8 @@ def build_interface() -> gr.Blocks:
         chat = gr.Chatbot(label="Chatverlauf")
 
         with gr.Row():
-            k = gr.Slider(minimum=1, maximum=1000, value=2, step=1, label="k")
-            fetch_k = gr.Slider(minimum=1, maximum=2000, value=5, step=1, label="fetch_k")
+            k = gr.Slider(minimum=1, maximum=1000, value=20, step=1, label="k")
+            fetch_k = gr.Slider(minimum=1, maximum=2000, value=50, step=1, label="fetch_k")
             score_threshold = gr.Slider(
                 minimum=0.0, maximum=1.0, value=0.6, step=0.05, label="score_threshold"
             )

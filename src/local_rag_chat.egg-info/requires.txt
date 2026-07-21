@@ -7,8 +7,6 @@ langchain-qdrant
 langchain-ollama
 qdrant-client
 pytesseract
-unstructured[pdf]
-unstructured-inference
-pdf2image
-pypdf
+pymupdf
+pymupdf4llm
 fastembed

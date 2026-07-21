@@ -1,6 +1,6 @@
 Metadata-Version: 2.4
 Name: local-rag-chat
-Version: 0.2.7
+Version: 0.2.8
 Summary: A completely local RAG application using Gradio, LangChain, Qdrant, and Ollama
 Author-email: "Dr. Alireza Bayat" <dr.bayat.alireza@gmail.com>
 Classifier: Programming Language :: Python :: 3
@@ -17,10 +17,8 @@ Requires-Dist: langchain-qdrant
 Requires-Dist: langchain-ollama
 Requires-Dist: qdrant-client
 Requires-Dist: pytesseract
-Requires-Dist: unstructured[pdf]
-Requires-Dist: unstructured-inference
-Requires-Dist: pdf2image
-Requires-Dist: pypdf
+Requires-Dist: pymupdf
+Requires-Dist: pymupdf4llm
 Requires-Dist: fastembed
 
 # Local RAG Chat

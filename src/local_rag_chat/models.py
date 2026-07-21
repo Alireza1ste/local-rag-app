@@ -15,8 +15,8 @@ class RAGConfig:
         search_type: Type of search to perform ('similarity', 'mmr', 'similarity_score_threshold').
     """
 
-    k: int = 2
-    fetch_k: int = 5
+    k: int = 20
+    fetch_k: int = 50
     score_threshold: float = 0.6
     search_type: Literal["similarity", "mmr", "similarity_score_threshold"] = "similarity"
 

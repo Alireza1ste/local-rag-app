@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "local-rag-chat"
-version = "0.2.7"
+version = "0.2.8"
 authors = [
     { name="Dr. Alireza Bayat", email="dr.bayat.alireza@gmail.com" }
 ]
@@ -26,10 +26,8 @@ dependencies = [
     "langchain-ollama",
     "qdrant-client",
     "pytesseract",
-    "unstructured[pdf]",
-    "unstructured-inference",
-    "pdf2image",
-    "pypdf",
+    "pymupdf",
+    "pymupdf4llm",
     "fastembed",
 ]
 
