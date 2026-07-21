@@ -26,17 +26,14 @@ POPPLER_CANDIDATE_PATHS = [
     r'C:\Program Files\Poppler\Library\bin',
 ]
 
-# Automatically detect Poppler if installed via winget
 local_appdata = os.environ.get("LOCALAPPDATA", "")
 if local_appdata:
     winget_packages = Path(local_appdata) / "Microsoft" / "WinGet" / "Packages"
     if winget_packages.exists():
-        # Search for pdftoppm.exe specifically inside the Poppler winget package
         for pdftoppm_exe in winget_packages.rglob("pdftoppm.exe"):
             if "Poppler" in str(pdftoppm_exe):
                 POPPLER_CANDIDATE_PATHS.append(str(pdftoppm_exe.parent))
 
-# Inject the found Poppler path into Python's environment
 for poppler_path in POPPLER_CANDIDATE_PATHS:
     if os.path.exists(poppler_path) and poppler_path not in os.environ["PATH"]:
         os.environ["PATH"] += os.pathsep + poppler_path
@@ -44,16 +41,13 @@ for poppler_path in POPPLER_CANDIDATE_PATHS:
 
 def load_documents_from_uploads(
     uploaded_files: Optional[Sequence[str]],
-    ocr_languages: Optional[list[str]] = None,
+    ocr_lang_map: Optional[dict[str, list[str]]] = None,
 ) -> list[Document]:
-    """Load documents from uploaded file paths.
-    
-    Supports .txt and .pdf files (including scanned PDFs via OCR). 
-    Skips unsupported formats with warning.
+    """Load documents from uploaded file paths with per-file OCR language configuration.
     
     Args:
         uploaded_files: Sequence of file paths to load.
-        ocr_languages: List of language codes for OCR (e.g., ["eng", "deu"]).
+        ocr_lang_map: Mapping of {file_path: [language_codes]}.
     
     Returns:
         List of LangChain Document objects.
@@ -61,16 +55,13 @@ def load_documents_from_uploads(
     if not uploaded_files:
         return []
 
-    # Default to English and German if nothing is passed
-    if not ocr_languages:
-        ocr_languages = ["eng", "deu"]
-
     uploaded_files = (
         [uploaded_files]
         if isinstance(uploaded_files, (str, Path))
         else uploaded_files
     )
     documents: list[Document] = []
+    ocr_lang_map = ocr_lang_map or {}
 
     for uploaded_file in uploaded_files:
         path = Path(uploaded_file)
@@ -78,17 +69,19 @@ def load_documents_from_uploads(
             continue
 
         ext = path.suffix.lower()
+        # Fallback search by exact path string or filename
+        file_langs = ocr_lang_map.get(str(path)) or ocr_lang_map.get(path.name) or ["eng", "deu"]
+
         try:
             if ext == ".txt":
                 loader = TextLoader(str(path), encoding="utf-8")
                 documents.extend(loader.load())
             elif ext == ".pdf":
-                # Pass the selected languages to the UnstructuredPDFLoader
                 loader = UnstructuredPDFLoader(
                     str(path),
                     mode="single",
                     strategy="auto",
-                    languages=ocr_languages,
+                    languages=file_langs,
                 )
                 documents.extend(loader.load())
             else:
@@ -103,15 +96,7 @@ def split_documents(
     documents: list[Document],
     config: VectorstoreConfig | None = None,
 ) -> list[Document]:
-    """Split documents into chunks using recursive text splitter.
-    
-    Args:
-        documents: List of documents to split.
-        config: Vector store configuration with chunk settings.
-    
-    Returns:
-        List of split Document objects.
-    """
+    """Split documents into chunks using recursive text splitter."""
     if not documents:
         return []
 
@@ -128,18 +113,7 @@ def create_vectorstore(
     embeddings_config: EmbeddingsConfig | None = None,
     vectorstore_config: VectorstoreConfig | None = None,
 ) -> QdrantVectorStore:
-    """Create a Qdrant vector store with hybrid retrieval.
-    
-    Combines dense embeddings with sparse BM25 embeddings for hybrid search.
-    
-    Args:
-        documents: List of documents to index.
-        embeddings_config: Configuration for embeddings model.
-        vectorstore_config: Configuration for vector store.
-    
-    Returns:
-        Initialized QdrantVectorStore instance.
-    """
+    """Create a Qdrant vector store with hybrid retrieval."""
     emb_cfg = embeddings_config or EmbeddingsConfig()
     vs_cfg = vectorstore_config or VectorstoreConfig()
 

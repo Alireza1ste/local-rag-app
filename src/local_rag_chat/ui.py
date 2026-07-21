@@ -1,11 +1,11 @@
 """Gradio UI orchestration and event handlers."""
 
+from pathlib import Path
 from typing import Optional
 
 import gradio as gr
 from langchain_qdrant import QdrantVectorStore
 
-from .models import RAGConfig
 from .document_processor import (
     create_vectorstore,
     load_documents_from_uploads,
@@ -36,22 +36,15 @@ ALL_LANGUAGES = [
 
 def process_uploaded_documents(
     uploaded_files: list, 
-    ocr_languages: list
+    file_lang_map: dict
 ) -> tuple[Optional[QdrantVectorStore], str]:
-    """Process uploaded documents and create vector store.
-    
-    Args:
-        uploaded_files: List of uploaded file paths.
-        ocr_languages: List of language codes to use for OCR.
-    
-    Returns:
-        Tuple of (vectorstore or None, status_message).
-    """
+    """Process uploaded documents and create vector store using assigned languages."""
     if not uploaded_files:
-        return None, "Keine Dokumente geladen."
+        return None, "❌ Bitte laden Sie zuerst mindestens ein Dokument hoch."
 
     try:
-        raw_documents = load_documents_from_uploads(uploaded_files, ocr_languages)
+        file_paths = [f.name for f in uploaded_files]
+        raw_documents = load_documents_from_uploads(file_paths, file_lang_map)
 
         if not raw_documents:
             return None, "❌ Es konnten keine Inhalte aus den Dateien extrahiert werden."
@@ -81,39 +74,22 @@ def handle_query(
     search_type: str,
     chat_history: list,
 ) -> tuple[str, str, list]:
-    """Process user query and generate response using RAG chain.
-    
-    Args:
-        question: User question.
-        vectorstore: Current document vector store.
-        role: System role prompt.
-        k: Number of documents to retrieve.
-        fetch_k: Number to fetch before ranking.
-        score_threshold: Similarity threshold.
-        search_type: Type of retrieval search.
-        chat_history: Previous chat messages.
-    
-    Returns:
-        Tuple of (answer, sources, updated_chat_history).
-    """
+    """Process user query and generate response using RAG chain."""
     output_chat = chat_history if chat_history else []
 
     if not question or not question.strip():
         return "", "", output_chat
 
-    # No vectorstore loaded
     if not vectorstore:
-        msg = "Bitte laden Sie zuerst ein Dokument (TXT oder PDF) hoch."
+        msg = "Bitte laden Sie zuerst ein Dokument (TXT oder PDF) hoch und verarbeiten Sie es."
         output_chat.append({"role": "user", "content": question})
         output_chat.append({"role": "assistant", "content": msg})
         return msg, "", output_chat
 
     try:
-        # Normalize history for RAG chain
         normalized_history = normalize_chat_history(output_chat)
         condensed = condense_question(normalized_history, question)
 
-        # Build chain and invoke
         retriever = create_retriever(vectorstore, k, fetch_k, score_threshold, search_type)
         llm = build_llm()
         rag_chain = build_rag_chain(retriever, llm, role)
@@ -123,14 +99,12 @@ def handle_query(
             "input_text": question,
         })
 
-        # Get source documents
         sources = retriever.invoke(condensed)
         source_text = "\n\n".join(
             f"{idx}. {doc.page_content[:400].replace(chr(10), ' ')}..."
             for idx, doc in enumerate(sources, 1)
         )
 
-        # Update chat history
         output_chat.append({"role": "user", "content": question})
         output_chat.append({"role": "assistant", "content": answer})
 
@@ -144,35 +118,60 @@ def handle_query(
 
 
 def build_interface() -> gr.Blocks:
-    """Build Gradio interface for RAG application.
-    
-    Returns:
-        Configured Gradio Blocks interface.
-    """
+    """Build Gradio interface for RAG application."""
     with gr.Blocks(title="RAG Workshop UI") as demo:
         vs_state = gr.State(None)
+        file_lang_map = gr.State({})
 
         gr.Markdown("# RAG-Dokumente mit Gradio")
         gr.Markdown(
-            "Laden Sie Dokumente (TXT, PDF) hoch, wählen Sie Retrieval-Parameter "
-            "und stellen Sie eine Frage. (Läuft zu 100% lokal via Ollama inkl. OCR für PDFs)"
+            "Wählen Sie Dokumente (TXT, PDF) aus, stellen Sie die OCR-Sprache für jedes Dokument ein, "
+            "und klicken Sie auf **Dokumente verarbeiten**."
         )
 
         with gr.Row():
             with gr.Column():
-                ocr_languages = gr.Dropdown(
-                    choices=ALL_LANGUAGES,
-                    value=["eng", "deu"],
-                    multiselect=True,
-                    label="OCR Sprachen (Bitte vor dem Upload auswählen)",
-                    info="Suchen Sie nach Sprachen und wählen Sie bei Bedarf mehrere aus."
-                )
                 files = gr.File(
-                    label="Dokumente hochladen (TXT, PDF)",
+                    label="1. Dokumente auswählen (TXT, PDF)",
                     file_types=[".txt", ".pdf"],
                     file_count="multiple",
                 )
-                status_text = gr.Markdown("⏳ Warte auf Dokumente...")
+                
+                # Render ONLY when 'files' changes (prevents re-render loops)
+                @gr.render(inputs=[files])
+                def render_per_file_languages(uploaded_files):
+                    if not uploaded_files:
+                        return
+                    
+                    gr.Markdown("### 🌐 2. OCR-Sprache(n) pro Dokument auswählen")
+                    for file_obj in uploaded_files:
+                        file_path = file_obj.name
+                        file_name = Path(file_path).name
+
+                        # Explicitly set interactive=True so it can be clicked & edited
+                        dd = gr.Dropdown(
+                            choices=ALL_LANGUAGES,
+                            value=["eng", "deu"],
+                            multiselect=True,
+                            interactive=True,
+                            label=f"Sprache(n) für: {file_name}",
+                            info="Klicken Sie ins Feld oder tippen Sie, um weitere Sprachen zu suchen."
+                        )
+
+                        # Update state without triggering render_per_file_languages again
+                        def update_language_for_file(selected_langs, current_map, path=file_path):
+                            updated_map = dict(current_map or {})
+                            updated_map[path] = selected_langs
+                            return updated_map
+
+                        dd.change(
+                            fn=update_language_for_file,
+                            inputs=[dd, file_lang_map],
+                            outputs=[file_lang_map],
+                        )
+
+                process_btn = gr.Button("⚙️ 3. Dokumente verarbeiten", variant="primary")
+                status_text = gr.Markdown("⏳ Warte auf Dokumenten-Upload...")
 
             with gr.Column():
                 question = gr.Textbox(label="Frage", lines=3)
@@ -198,15 +197,27 @@ def build_interface() -> gr.Blocks:
             answer_output = gr.Textbox(label="Antwort", lines=10)
             source_output = gr.Textbox(label="Quellen", lines=10)
 
+        # Pre-populate map defaults when files uploaded
+        def initialize_file_map(uploaded_files):
+            if not uploaded_files:
+                return {}
+            return {f.name: ["eng", "deu"] for f in uploaded_files}
+
         files.upload(
+            fn=initialize_file_map,
+            inputs=[files],
+            outputs=[file_lang_map],
+        )
+
+        process_btn.click(
             fn=process_uploaded_documents,
-            inputs=[files, ocr_languages],
+            inputs=[files, file_lang_map],
             outputs=[vs_state, status_text],
         )
 
         files.clear(
-            fn=lambda: (None, "🗑️ Dokumente entfernt. Bitte neue hochladen."),
-            outputs=[vs_state, status_text],
+            fn=lambda: (None, {}, "🗑️ Dokumente entfernt. Bitte neue hochladen."),
+            outputs=[vs_state, file_lang_map, status_text],
         )
 
         submit.click(
