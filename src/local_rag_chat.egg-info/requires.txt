@@ -2,7 +2,13 @@ gradio>=4.0.0
 python-dotenv
 langchain-core
 langchain-community
+langchain-text-splitters
 langchain-qdrant
 langchain-ollama
+qdrant-client
+pytesseract
+unstructured[pdf]
+unstructured-inference
+pdf2image
 pypdf
 fastembed

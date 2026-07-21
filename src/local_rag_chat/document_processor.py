@@ -1,9 +1,11 @@
 """Document processing and vector store management."""
 
+import os
 from pathlib import Path
 from typing import Optional, Sequence
 
-from langchain_community.document_loaders import PyPDFLoader, TextLoader
+import pytesseract
+from langchain_community.document_loaders import TextLoader, UnstructuredPDFLoader
 from langchain_core.documents import Document
 from langchain_qdrant import FastEmbedSparse, QdrantVectorStore, RetrievalMode
 from langchain_text_splitters import RecursiveCharacterTextSplitter
@@ -11,22 +13,57 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 from .models import EmbeddingsConfig, VectorstoreConfig
 from .utils import build_embeddings
 
+# Safe Tesseract OCR path configuration for Windows
+TESSERACT_WIN_PATH = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
+if os.path.exists(TESSERACT_WIN_PATH):
+    pytesseract.pytesseract.pytesseract_cmd = TESSERACT_WIN_PATH
+
+# Safe Poppler path configuration for Windows
+POPPLER_CANDIDATE_PATHS = [
+    r'C:\Program Files\poppler\bin',
+    r'C:\Program Files\poppler\Library\bin',
+    r'C:\Program Files\Poppler\bin',
+    r'C:\Program Files\Poppler\Library\bin',
+]
+
+# Automatically detect Poppler if installed via winget
+local_appdata = os.environ.get("LOCALAPPDATA", "")
+if local_appdata:
+    winget_packages = Path(local_appdata) / "Microsoft" / "WinGet" / "Packages"
+    if winget_packages.exists():
+        # Search for pdftoppm.exe specifically inside the Poppler winget package
+        for pdftoppm_exe in winget_packages.rglob("pdftoppm.exe"):
+            if "Poppler" in str(pdftoppm_exe):
+                POPPLER_CANDIDATE_PATHS.append(str(pdftoppm_exe.parent))
+
+# Inject the found Poppler path into Python's environment
+for poppler_path in POPPLER_CANDIDATE_PATHS:
+    if os.path.exists(poppler_path) and poppler_path not in os.environ["PATH"]:
+        os.environ["PATH"] += os.pathsep + poppler_path
+
 
 def load_documents_from_uploads(
     uploaded_files: Optional[Sequence[str]],
+    ocr_languages: Optional[list[str]] = None,
 ) -> list[Document]:
     """Load documents from uploaded file paths.
     
-    Supports .txt and .pdf files. Skips unsupported formats with warning.
+    Supports .txt and .pdf files (including scanned PDFs via OCR). 
+    Skips unsupported formats with warning.
     
     Args:
         uploaded_files: Sequence of file paths to load.
+        ocr_languages: List of language codes for OCR (e.g., ["eng", "deu"]).
     
     Returns:
         List of LangChain Document objects.
     """
     if not uploaded_files:
         return []
+
+    # Default to English and German if nothing is passed
+    if not ocr_languages:
+        ocr_languages = ["eng", "deu"]
 
     uploaded_files = (
         [uploaded_files]
@@ -46,7 +83,13 @@ def load_documents_from_uploads(
                 loader = TextLoader(str(path), encoding="utf-8")
                 documents.extend(loader.load())
             elif ext == ".pdf":
-                loader = PyPDFLoader(str(path), extract_images=True)
+                # Pass the selected languages to the UnstructuredPDFLoader
+                loader = UnstructuredPDFLoader(
+                    str(path),
+                    mode="single",
+                    strategy="auto",
+                    languages=ocr_languages,
+                )
                 documents.extend(loader.load())
             else:
                 print(f"⚠️ Skipping unsupported format: {ext}")

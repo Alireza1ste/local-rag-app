@@ -17,12 +17,32 @@ from .utils import build_llm, create_retriever
 
 DEFAULT_ROLE = "You are a helpful assistant"
 
+ALL_LANGUAGES = [
+    "afr", "amh", "ara", "asm", "aze", "aze_cyrl", "bel", "ben", "bod", "bos", 
+    "bre", "bul", "cat", "ceb", "ces", "chi_sim", "chi_sim_vert", "chi_tra", 
+    "chi_tra_vert", "chr", "cos", "cym", "dan", "deu", "deu_latf", "div", "dzo", 
+    "ell", "eng", "enm", "epo", "equ", "est", "eus", "fao", "fas", "fil", "fin", 
+    "fra", "frk", "frm", "fry", "gla", "gle", "glg", "grc", "guj", "hat", "heb", 
+    "hin", "hrv", "hun", "hye", "iku", "ind", "isl", "ita", "ita_old", "jav", 
+    "jpn", "jpn_vert", "kan", "kat", "kat_old", "kaz", "khm", "kir", "kmr", 
+    "kor", "kor_vert", "lao", "lat", "lav", "lit", "ltz", "mal", "mar", "mkd", 
+    "mlt", "mon", "mri", "msa", "mya", "nep", "nld", "nor", "oci", "ori", "osd", 
+    "pan", "pol", "por", "pus", "que", "ron", "rus", "san", "sin", "slk", "slv", 
+    "snd", "spa", "spa_old", "sqi", "srp", "srp_latn", "sun", "swa", "swe", "syr", 
+    "tam", "tat", "tel", "tgk", "tha", "tir", "ton", "tur", "uig", "ukr", "urd", 
+    "uzb", "uzb_cyrl", "vie", "yid", "yor"
+]
 
-def process_uploaded_documents(uploaded_files: list) -> tuple[Optional[QdrantVectorStore], str]:
+
+def process_uploaded_documents(
+    uploaded_files: list, 
+    ocr_languages: list
+) -> tuple[Optional[QdrantVectorStore], str]:
     """Process uploaded documents and create vector store.
     
     Args:
         uploaded_files: List of uploaded file paths.
+        ocr_languages: List of language codes to use for OCR.
     
     Returns:
         Tuple of (vectorstore or None, status_message).
@@ -31,7 +51,7 @@ def process_uploaded_documents(uploaded_files: list) -> tuple[Optional[QdrantVec
         return None, "Keine Dokumente geladen."
 
     try:
-        raw_documents = load_documents_from_uploads(uploaded_files)
+        raw_documents = load_documents_from_uploads(uploaded_files, ocr_languages)
 
         if not raw_documents:
             return None, "❌ Es konnten keine Inhalte aus den Dateien extrahiert werden."
@@ -140,6 +160,13 @@ def build_interface() -> gr.Blocks:
 
         with gr.Row():
             with gr.Column():
+                ocr_languages = gr.Dropdown(
+                    choices=ALL_LANGUAGES,
+                    value=["eng", "deu"],
+                    multiselect=True,
+                    label="OCR Sprachen (Bitte vor dem Upload auswählen)",
+                    info="Suchen Sie nach Sprachen und wählen Sie bei Bedarf mehrere aus."
+                )
                 files = gr.File(
                     label="Dokumente hochladen (TXT, PDF)",
                     file_types=[".txt", ".pdf"],
@@ -173,7 +200,7 @@ def build_interface() -> gr.Blocks:
 
         files.upload(
             fn=process_uploaded_documents,
-            inputs=[files],
+            inputs=[files, ocr_languages],
             outputs=[vs_state, status_text],
         )
 

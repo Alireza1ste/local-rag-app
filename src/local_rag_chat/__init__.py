@@ -1,8 +1,8 @@
 """Local RAG Chat - A completely local RAG application using Gradio, LangChain, Qdrant, and Ollama."""
 
-__version__ = "0.2.1"
-__author__ = "Your Name"
-__email__ = "your.email@example.com"
+__version__ = "0.2.6"
+__author__ = "Dr. Alireza Bayat"
+__email__ = "dr.bayat.alireza@gmail.com"
 
 from .app import main
 

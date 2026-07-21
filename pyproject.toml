@@ -4,9 +4,9 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "local-rag-chat"
-version = "0.2.1"
+version = "0.2.6"
 authors = [
-    { name="Your Name", email="your.email@example.com" }
+    { name="Dr. Alireza Bayat", email="dr.bayat.alireza@gmail.com" }
 ]
 description = "A completely local RAG application using Gradio, LangChain, Qdrant, and Ollama"
 readme = "README.md"
@@ -21,8 +21,14 @@ dependencies = [
     "python-dotenv",
     "langchain-core",
     "langchain-community",
+    "langchain-text-splitters",
     "langchain-qdrant",
     "langchain-ollama",
+    "qdrant-client",
+    "pytesseract",
+    "unstructured[pdf]",
+    "unstructured-inference",
+    "pdf2image",
     "pypdf",
     "fastembed",
 ]
