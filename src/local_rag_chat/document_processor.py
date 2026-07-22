@@ -3,12 +3,12 @@
 import base64
 import io
 import os
+import re
 from pathlib import Path
 from typing import Optional, Sequence
 
 import fitz  # PyMuPDF
 import pymupdf4llm
-import pytesseract
 from PIL import Image
 from langchain_community.document_loaders import TextLoader
 from langchain_core.documents import Document
@@ -19,31 +19,6 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 from .models import EmbeddingsConfig, VectorstoreConfig
 from .utils import build_embeddings
-
-# Safe Tesseract OCR path configuration for Windows
-TESSERACT_WIN_PATH = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
-if os.path.exists(TESSERACT_WIN_PATH):
-    pytesseract.pytesseract.pytesseract_cmd = TESSERACT_WIN_PATH
-
-# Safe Poppler path configuration for Windows
-POPPLER_CANDIDATE_PATHS = [
-    r'C:\Program Files\poppler\bin',
-    r'C:\Program Files\poppler\Library\bin',
-    r'C:\Program Files\Poppler\bin',
-    r'C:\Program Files\Poppler\Library\bin',
-]
-
-local_appdata = os.environ.get("LOCALAPPDATA", "")
-if local_appdata:
-    winget_packages = Path(local_appdata) / "Microsoft" / "WinGet" / "Packages"
-    if winget_packages.exists():
-        for pdftoppm_exe in winget_packages.rglob("pdftoppm.exe"):
-            if "Poppler" in str(pdftoppm_exe):
-                POPPLER_CANDIDATE_PATHS.append(str(pdftoppm_exe.parent))
-
-for poppler_path in POPPLER_CANDIDATE_PATHS:
-    if os.path.exists(poppler_path) and poppler_path not in os.environ["PATH"]:
-        os.environ["PATH"] += os.pathsep + poppler_path
 
 
 UNIVERSAL_VISION_PROMPT = (
@@ -57,7 +32,7 @@ UNIVERSAL_VISION_PROMPT = (
 
 
 def prepare_image_for_ollama(image_bytes: bytes, max_dim: int = 1024) -> Optional[str]:
-    """Downscale, compress, and filter out only tiny artifacts, leaving formulas and portraits to the LLM."""
+    """Downscale, compress, and filter out tiny artifacts."""
     try:
         img = Image.open(io.BytesIO(image_bytes))
         w, h = img.size
@@ -127,8 +102,8 @@ def get_pdf_page_visual_analyses(pdf_path: str, vision_model: str = "gemma4:26b"
 
                 page_analyses[page_num].append(f"[Visual Analysis | Image {img_index + 1}]: {analysis_text}")
                 has_extracted_raster = True
-            except Exception as e:
-                pass
+            except Exception as err:
+                print(f"  ⚠️ Image processing warning on page {page_num + 1}, image {img_index + 1}: {err}")
 
         # Tier 2: Page drawings/schematics
         if not has_extracted_raster and (len(drawings) > 0 or len(text_content) < 300):
@@ -149,15 +124,24 @@ def get_pdf_page_visual_analyses(pdf_path: str, vision_model: str = "gemma4:26b"
 
                     if not ("SKIP" in analysis_text.upper() and len(analysis_text) < 15):
                         page_analyses[page_num].append(f"[Page Schematic Analysis]: {analysis_text}")
-            except Exception as e:
-                pass
+            except Exception as err:
+                print(f"  ⚠️ Schematic processing warning on page {page_num + 1}: {err}")
 
     return page_analyses
 
 
+def extract_primary_subject(text: str, fallback_filename: str) -> str:
+    """Extract prominent names or titles from text to contextualize visual descriptions."""
+    matches = re.findall(r"(?:Dr\.|Prof\.|Mr\.|Ms\.)?\s*[A-Z][a-z]+\s+[A-Z][a-z]+", text)
+    if matches:
+        # Pick the most common name or top heading match
+        return matches[0]
+    return fallback_filename.rsplit(".", 1)[0].replace("_", " ").title()
+
+
 def load_documents_from_uploads(
     uploaded_files: Optional[Sequence[str]],
-    ocr_lang_map: Optional[dict[str, list[str]]] = None,
+    enable_vision: bool = False,
 ) -> list[Document]:
     """Load documents, extracting markdown text per page and merging visual analyses directly."""
     if not uploaded_files:
@@ -182,21 +166,53 @@ def load_documents_from_uploads(
                 loader = TextLoader(str(path), encoding="utf-8")
                 documents.extend(loader.load())
             elif ext == ".pdf":
-                print(f"📝 Extracting markdown and merging visual content for {path.name}...")
+                print(f"📝 Extracting markdown from {path.name}...")
                 
                 # Get layout-aware markdown page-by-page
                 page_chunks = pymupdf4llm.to_markdown(str(path), page_chunks=True)
-                # Run vision analysis mapped by page
-                visual_analyses = get_pdf_page_visual_analyses(str(path))
+                
+                # Extract full text to identify overall subject name
+                full_doc_text = " ".join(chunk["text"] for chunk in page_chunks)
+                primary_subject = extract_primary_subject(full_doc_text, path.name)
+
+                # Conditionally run vision analysis based on UI toggle
+                visual_analyses = {}
+                if enable_vision:
+                    visual_analyses = get_pdf_page_visual_analyses(str(path))
+                else:
+                    print(f"👁️ Vision analysis disabled. Skipping image processing for {path.name}.")
 
                 for chunk in page_chunks:
                     page_num = chunk["metadata"]["page_number"] - 1  # 0-based index
-                    page_text = chunk["text"]
+                    page_text = chunk["text"].strip()
 
-                    # Directly append visual analysis to the exact same page chunk text
+                    # Extract first non-empty line as page header
+                    page_header = ""
+                    for line in page_text.split("\n"):
+                        clean_line = line.strip("# ").strip()
+                        if clean_line:
+                            page_header = clean_line[:100]
+                            break
+                    if not page_header:
+                        page_header = f"{primary_subject} - Page {page_num + 1}"
+
+                    # Prepend visual analysis directly tied to primary subject and page header
                     if page_num in visual_analyses and visual_analyses[page_num]:
-                        visual_block = "\n\n".join(visual_analyses[page_num])
-                        page_text += f"\n\n--- VISUAL / IMAGE ANALYSIS FOR THIS PAGE ---\n{visual_block}"
+                        contextualized_visuals = [
+                            f"[Visual Analysis for Subject '{primary_subject}' (Page Context: {page_header})]: {va}"
+                            for va in visual_analyses[page_num]
+                        ]
+                        visual_block = "\n".join(contextualized_visuals)
+                        page_text = (
+                            f"=== DOCUMENT: {path.name} | SUBJECT: {primary_subject} ===\n"
+                            f"--- VISUAL ANALYSIS ---\n{visual_block}\n\n"
+                            f"--- PAGE CONTENT ---\n{page_text}"
+                        )
+                    else:
+                        page_text = (
+                            f"=== DOCUMENT: {path.name} | SUBJECT: {primary_subject} ===\n"
+                            f"{page_text}"
+                        )
 
                     documents.append(
                         Document(
@@ -204,9 +220,10 @@ def load_documents_from_uploads(
                             metadata={
                                 "source": str(path),
                                 "file_name": path.name,
+                                "primary_subject": primary_subject,
                                 "page": page_num,
-                                "type": "page_markdown_combined"
-                            }
+                                "type": "page_markdown_combined",
+                            },
                         )
                     )
             else:

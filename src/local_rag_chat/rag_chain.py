@@ -1,40 +1,30 @@
 """RAG chain construction and query processing."""
 
+import re
 from operator import itemgetter
 from typing import Optional
 
 from langchain_core.language_models import BaseLanguageModel
+from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate
-from langchain_core.runnables import Runnable
+from langchain_core.runnables import Runnable, RunnablePassthrough
 
 from .models import ChatMessage
 from .utils import (
-    build_llm,
+    PRONOUN_PATTERN,
     build_system_prompt,
     extract_question_prefix,
     format_documents,
     replace_pronouns_with_context,
 )
-from langchain_core.output_parsers import StrOutputParser
 
 
 def build_rag_chain(
     retriever,
     llm: BaseLanguageModel,
-    role: str = "You are a helpful assistant",
+    role: str = "You are a patent attorney.",
 ) -> Runnable:
-    """Build a RAG chain for question answering.
-    
-    Combines document retrieval with LLM generation using semantic search.
-    
-    Args:
-        retriever: LangChain retriever for document lookup.
-        llm: Language model for generation.
-        role: System role prompt.
-    
-    Returns:
-        Runnable RAG chain (input: dict with search_query, input_text).
-    """
+    """Build a RAG chain that returns both answer and retrieved source documents in one pass."""
     prompt = ChatPromptTemplate.from_messages(
         [
             ("system", build_system_prompt(role)),
@@ -42,15 +32,19 @@ def build_rag_chain(
         ]
     )
 
-    # Decouple semantic search query from LLM text prompt via itemgetter
-    return (
-        {
-            "context": itemgetter("search_query") | retriever | format_documents,
-            "input": itemgetter("input_text"),
-        }
-        | prompt
-        | llm
-        | StrOutputParser()
+    return RunnablePassthrough.assign(
+        docs=itemgetter("search_query") | retriever
+    ).assign(
+        context=lambda x: format_documents(x["docs"]),
+        answer=(
+            {
+                "context": lambda x: format_documents(x["docs"]),
+                "input": itemgetter("input_text"),
+            }
+            | prompt
+            | llm
+            | StrOutputParser()
+        )
     )
 
 
@@ -145,5 +139,3 @@ def condense_question(history: list, message: str) -> str:
     return " ".join(condensed.split())
 
 
-# Import pattern check after functions to avoid circular deps
-from .utils import PRONOUN_PATTERN

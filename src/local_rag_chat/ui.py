@@ -15,36 +15,21 @@ from .rag_chain import build_rag_chain, condense_question, normalize_chat_histor
 from .utils import build_llm, create_retriever
 
 
-DEFAULT_ROLE = "You are a helpful assistant"
-
-ALL_LANGUAGES = [
-    "afr", "amh", "ara", "asm", "aze", "aze_cyrl", "bel", "ben", "bod", "bos", 
-    "bre", "bul", "cat", "ceb", "ces", "chi_sim", "chi_sim_vert", "chi_tra", 
-    "chi_tra_vert", "chr", "cos", "cym", "dan", "deu", "deu_latf", "div", "dzo", 
-    "ell", "eng", "enm", "epo", "equ", "est", "eus", "fao", "fas", "fil", "fin", 
-    "fra", "frk", "frm", "fry", "gla", "gle", "glg", "grc", "guj", "hat", "heb", 
-    "hin", "hrv", "hun", "hye", "iku", "ind", "isl", "ita", "ita_old", "jav", 
-    "jpn", "jpn_vert", "kan", "kat", "kat_old", "kaz", "khm", "kir", "kmr", 
-    "kor", "kor_vert", "lao", "lat", "lav", "lit", "ltz", "mal", "mar", "mkd", 
-    "mlt", "mon", "mri", "msa", "mya", "nep", "nld", "nor", "oci", "ori", "osd", 
-    "pan", "pol", "por", "pus", "que", "ron", "rus", "san", "sin", "slk", "slv", 
-    "snd", "spa", "spa_old", "sqi", "srp", "srp_latn", "sun", "swa", "swe", "syr", 
-    "tam", "tat", "tel", "tgk", "tha", "tir", "ton", "tur", "uig", "ukr", "urd", 
-    "uzb", "uzb_cyrl", "vie", "yid", "yor"
-]
+DEFAULT_ROLE = "You are a patent attorney."
 
 
 def process_uploaded_documents(
-    uploaded_files: list, 
-    file_lang_map: dict
+    uploaded_files: list,
+    enable_vision: bool,
 ) -> tuple[Optional[QdrantVectorStore], str]:
-    """Process uploaded documents and create vector store using assigned languages."""
+    """Process uploaded documents and create vector store."""
     if not uploaded_files:
         return None, "❌ Bitte laden Sie zuerst mindestens ein Dokument hoch."
 
     try:
         file_paths = [f.name for f in uploaded_files]
-        raw_documents = load_documents_from_uploads(file_paths, file_lang_map)
+        # Pass the vision toggle state to the document loader
+        raw_documents = load_documents_from_uploads(file_paths, enable_vision=enable_vision)
 
         if not raw_documents:
             return None, "❌ Es konnten keine Inhalte aus den Dateien extrahiert werden."
@@ -94,12 +79,18 @@ def handle_query(
         llm = build_llm()
         rag_chain = build_rag_chain(retriever, llm, role)
 
-        answer = rag_chain.invoke({
+        chain_res = rag_chain.invoke({
             "search_query": condensed,
             "input_text": question,
         })
 
-        sources = retriever.invoke(condensed)
+        if isinstance(chain_res, dict):
+            answer = chain_res.get("answer", "")
+            sources = chain_res.get("docs", retriever.invoke(condensed))
+        else:
+            answer = chain_res
+            sources = retriever.invoke(condensed)
+
         source_text = "\n\n".join(
             f"{idx}. {doc.page_content[:400].replace(chr(10), ' ')}..."
             for idx, doc in enumerate(sources, 1)
@@ -121,13 +112,9 @@ def build_interface() -> gr.Blocks:
     """Build Gradio interface for RAG application."""
     with gr.Blocks(title="RAG Workshop UI") as demo:
         vs_state = gr.State(None)
-        file_lang_map = gr.State({})
 
         gr.Markdown("# RAG-Dokumente mit Gradio")
-        gr.Markdown(
-            "Wählen Sie Dokumente (TXT, PDF) aus, stellen Sie die OCR-Sprache für jedes Dokument ein, "
-            "und klicken Sie auf **Dokumente verarbeiten**."
-        )
+        gr.Markdown("Wählen Sie Dokumente (TXT, PDF) aus und klicken Sie auf **Dokumente verarbeiten**.")
 
         with gr.Row():
             with gr.Column():
@@ -136,41 +123,11 @@ def build_interface() -> gr.Blocks:
                     file_types=[".txt", ".pdf"],
                     file_count="multiple",
                 )
-                
-                # Render ONLY when 'files' changes (prevents re-render loops)
-                @gr.render(inputs=[files])
-                def render_per_file_languages(uploaded_files):
-                    if not uploaded_files:
-                        return
-                    
-                    gr.Markdown("### 🌐 2. OCR-Sprache(n) pro Dokument auswählen")
-                    for file_obj in uploaded_files:
-                        file_path = file_obj.name
-                        file_name = Path(file_path).name
-
-                        # Explicitly set interactive=True so it can be clicked & edited
-                        dd = gr.Dropdown(
-                            choices=ALL_LANGUAGES,
-                            value=["eng", "deu"],
-                            multiselect=True,
-                            interactive=True,
-                            label=f"Sprache(n) für: {file_name}",
-                            info="Klicken Sie ins Feld oder tippen Sie, um weitere Sprachen zu suchen."
-                        )
-
-                        # Update state without triggering render_per_file_languages again
-                        def update_language_for_file(selected_langs, current_map, path=file_path):
-                            updated_map = dict(current_map or {})
-                            updated_map[path] = selected_langs
-                            return updated_map
-
-                        dd.change(
-                            fn=update_language_for_file,
-                            inputs=[dd, file_lang_map],
-                            outputs=[file_lang_map],
-                        )
-
-                process_btn = gr.Button("⚙️ 3. Dokumente verarbeiten", variant="primary")
+                enable_vision = gr.Checkbox(
+                    label="👁️ Enable Vision OCR/Analysis (Langsamer, extrahiert Bilder & Diagramme)",
+                    value=False,
+                )
+                process_btn = gr.Button("⚙️ 2. Dokumente verarbeiten", variant="primary")
                 status_text = gr.Markdown("⏳ Warte auf Dokumenten-Upload...")
 
             with gr.Column():
@@ -197,27 +154,16 @@ def build_interface() -> gr.Blocks:
             answer_output = gr.Textbox(label="Antwort", lines=10)
             source_output = gr.Textbox(label="Quellen", lines=10)
 
-        # Pre-populate map defaults when files uploaded
-        def initialize_file_map(uploaded_files):
-            if not uploaded_files:
-                return {}
-            return {f.name: ["eng", "deu"] for f in uploaded_files}
-
-        files.upload(
-            fn=initialize_file_map,
-            inputs=[files],
-            outputs=[file_lang_map],
-        )
-
+        # Include enable_vision in the inputs
         process_btn.click(
             fn=process_uploaded_documents,
-            inputs=[files, file_lang_map],
+            inputs=[files, enable_vision],
             outputs=[vs_state, status_text],
         )
 
         files.clear(
-            fn=lambda: (None, {}, "🗑️ Dokumente entfernt. Bitte neue hochladen."),
-            outputs=[vs_state, file_lang_map, status_text],
+            fn=lambda: (None, "🗑️ Dokumente entfernt. Bitte neue hochladen."),
+            outputs=[vs_state, status_text],
         )
 
         submit.click(

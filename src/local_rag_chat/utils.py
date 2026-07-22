@@ -45,7 +45,7 @@ def build_embeddings(model_name: str = "embeddinggemma") -> OllamaEmbeddings:
     return OllamaEmbeddings(model=model_name)
 
 
-def build_system_prompt(role: str, default_role: str = "You are a helpful assistant") -> str:
+def build_system_prompt(role: str, default_role: str = "You are a patent attorney.") -> str:
     """Build a system prompt for the RAG chain.
     
     Args:
