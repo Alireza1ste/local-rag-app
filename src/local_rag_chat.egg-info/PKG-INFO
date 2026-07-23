@@ -1,6 +1,6 @@
 Metadata-Version: 2.4
 Name: local-rag-chat
-Version: 0.3.1
+Version: 0.3.2
 Summary: A completely local RAG application using Gradio, LangChain, Qdrant, and Ollama
 Author-email: "Dr. Alireza Bayat" <dr.bayat.alireza@gmail.com>
 Classifier: Programming Language :: Python :: 3
