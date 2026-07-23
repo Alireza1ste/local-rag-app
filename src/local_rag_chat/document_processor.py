@@ -15,6 +15,7 @@ from langchain_core.documents import Document
 from langchain_core.messages import HumanMessage
 from langchain_ollama import ChatOllama
 from langchain_qdrant import FastEmbedSparse, QdrantVectorStore, RetrievalMode
+from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 from .models import EmbeddingsConfig, VectorstoreConfig
 from .utils import build_embeddings
@@ -140,8 +141,10 @@ def extract_primary_subject(text: str, fallback_filename: str) -> str:
 def load_documents_from_uploads(
     uploaded_files: Optional[Sequence[str]],
     enable_vision: bool = False,
+    chunk_size: int = 1000,
+    chunk_overlap: int = 200,
 ) -> list[Document]:
-    """Load documents, extracting markdown text per page and merging visual analyses directly."""
+    """Load documents, extract text/vision per page, and chunk them into semantic segments."""
     if not uploaded_files:
         return []
 
@@ -150,7 +153,7 @@ def load_documents_from_uploads(
         if isinstance(uploaded_files, (str, Path))
         else uploaded_files
     )
-    documents: list[Document] = []
+    raw_documents: list[Document] = []
     
     for uploaded_file in uploaded_files:
         path = Path(uploaded_file)
@@ -162,7 +165,7 @@ def load_documents_from_uploads(
         try:
             if ext == ".txt":
                 loader = TextLoader(str(path), encoding="utf-8")
-                documents.extend(loader.load())
+                raw_documents.extend(loader.load())
             elif ext == ".pdf":
                 print(f"📝 Extracting markdown from {path.name}...")
                 
@@ -206,7 +209,7 @@ def load_documents_from_uploads(
                             f"{page_text}"
                         )
 
-                    documents.append(
+                    raw_documents.append(
                         Document(
                             page_content=page_text,
                             metadata={
@@ -223,7 +226,16 @@ def load_documents_from_uploads(
         except Exception as e:
             print(f"❌ Error loading {path.name}: {e}")
 
-    return documents
+    # Chunk all documents into bite-sized segments for high-precision retrieval
+    text_splitter = RecursiveCharacterTextSplitter(
+        chunk_size=chunk_size,
+        chunk_overlap=chunk_overlap,
+        separators=["\n\n", "\n", " ", ""],
+    )
+    chunked_documents = text_splitter.split_documents(raw_documents)
+    print(f"✂️ Chunked {len(raw_documents)} pages into {len(chunked_documents)} focused text chunks.")
+
+    return chunked_documents
 
 
 def create_vectorstore(

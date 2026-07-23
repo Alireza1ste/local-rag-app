@@ -37,7 +37,7 @@ def process_uploaded_documents(
         vectorstore = create_vectorstore(raw_documents)
         return (
             vectorstore,
-            f"✅ Erfolgreich verarbeitet: {len(raw_documents)} vollständige Seiten bereit für Anfragen.",
+            f"✅ Erfolgreich verarbeitet: {len(raw_documents)} Textabschnitte (Chunks) bereit für Anfragen.",
         )
 
     except Exception as exc:
