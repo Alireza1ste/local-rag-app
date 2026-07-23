@@ -26,9 +26,24 @@ Extract content from PDFs (with optional multi-modal vision analysis for charts,
 2. **Ollama**: Download and install [Ollama](https://ollama.com/).
 3. **Ollama Models**: Pull the required default models before launching:
 
-```bash
-# Main LLM / Vision model
-ollama pull gemma4:26b
+### Main LLM / Vision model
 
-# Embedding model
+```bash
+ollama pull gemma4:26b
+```
+
+### Embedding model eg. for OCR
+
+```bash
 ollama pull embeddinggemma
+```
+
+### Run
+
+1. First start Ollama
+2. run the command below in terminal
+3. open the browser at <http://127.0.0.1:7860> to go to the application
+
+```bash
+uv run local-rag-chat
+```

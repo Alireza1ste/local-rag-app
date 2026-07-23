@@ -1,21 +1,58 @@
 """Gradio UI orchestration and event handlers."""
 
+# maybe you need those 'standard lib ones'
 from pathlib import Path
 from typing import Optional
 
+# This is your core import as your UI is based on Gradio
 import gradio as gr
+
+# Basically at this level you don't want to deal with 'technicalities' any more
+
 from langchain_qdrant import QdrantVectorStore
 
+# Local imports ... probably some should be here ... not imported (utils)
+# and others may need to be pushed "down into" (.rag_chain)
+
+from .utils import build_llm, create_retriever
+from .rag_chain import build_rag_chain, condense_question, normalize_chat_history
 from .document_processor import (
     create_vectorstore,
     load_documents_from_uploads,
 )
-from .rag_chain import build_rag_chain, condense_question, normalize_chat_history
-from .utils import build_llm, create_retriever
 
 
+# Different "flight level" ?
+#
+# Probably a 'dataclass' with an enum of short keys & some labels is what you do here
+# OR this may actually belongs "somewhere" into the 'ondense_question' and you should not need to use it in UI ... maybe.
+ 
 DEFAULT_ROLE = "You are a patent attorney."
 
+# so these three functions both belong here, and they don't.
+# I got the feeling that the function should be here, but parts of them should be pushed down into an import.
+# or instead you may need to 'plug' things togeher (Event Listener Concept / Pattern).
+
+# eg. https://typing.python.org/en/latest/spec/protocol.html
+
+# sth like this ... with `ButtonListener`` in a separate file: may help
+# https://book.pythontips.com/en/latest/args_and_kwargs.html
+
+from typing import Protocol
+
+class ButtonListener(Protocol):
+
+    def list_args(self) -> list[str]:
+        pass
+
+    def onClick(self, **kwargs) -> dict:
+        pass
+
+
+def build_interface_v2(on_upload : ButtonListener, on_query : ButtonListener ) -> gr.Blocks:
+    pass
+
+# that way you can 
 
 def process_uploaded_documents(
     uploaded_files: list,
@@ -42,7 +79,6 @@ def process_uploaded_documents(
 
     except Exception as exc:
         return None, f"❌ Fehler bei der Verarbeitung: {exc}"
-
 
 def handle_query(
     question: str,
@@ -102,7 +138,6 @@ def handle_query(
         output_chat.append({"role": "user", "content": question})
         output_chat.append({"role": "assistant", "content": error_msg})
         return error_msg, "", output_chat
-
 
 def build_interface() -> gr.Blocks:
     """Build Gradio interface for RAG application."""

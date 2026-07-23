@@ -3,6 +3,13 @@
 from dataclasses import dataclass
 from typing import Literal
 
+# here the big problem is the "super generig name" 'models' turning the file into a random bag
+# first step: One class -> one file
+# 2nd step ... check where it is used and move some convenience functionality INTO the corresponding class
+# Nothing prevents a DatatClass from having some utility
+# Typical thing for eg. Configs:
+# - validate self
+# - to_<whatever> so that you can use it easily
 
 @dataclass
 class RAGConfig:

@@ -20,6 +20,9 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 from .models import EmbeddingsConfig, VectorstoreConfig
 from .utils import build_embeddings
 
+# Some of the imported stuff belongs "in here"
+# on the other hand this already is ~ 250 LoC.
+# So probably this needs to be sliced in two
 
 UNIVERSAL_VISION_PROMPT = (
     "Analyze this image concisely for a document search database:\n"

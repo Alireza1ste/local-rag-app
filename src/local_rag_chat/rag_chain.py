@@ -18,6 +18,11 @@ from .utils import (
     replace_pronouns_with_context,
 )
 
+# I think you want to extract the whole 'Chat History' as a single file ... and move all chat history stuff there
+# then you can deal with the rag-chain in a more isolated way.
+# Probably 'Chat History' is then also a Class (not a data-class) 
+
+#----
 
 def build_rag_chain(
     retriever,
@@ -47,6 +52,7 @@ def build_rag_chain(
         )
     )
 
+#----
 
 def normalize_chat_history(chat_history: list) -> list[ChatMessage]:
     """Normalize chat history into consistent ChatMessage format."""
