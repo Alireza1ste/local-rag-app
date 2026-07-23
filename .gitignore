@@ -1,0 +1,28 @@
+#Python
+__pycache__/
+*.py[cod]
+dist/
+*.egg-info/
+.enav
+
+#Jupyter notebook
+.ipynb_checkpoints
+
+# IDEs
+.vscode/
+.idea/
+
+# python Virtual env
+**/.venv/
+**/venv/
+.python-version
+pyvenv.cfg
+
+# OSX
+
+**/.DS_Store
+**/.localized
+**/__MACOSX/
+**/.AppleDouble
+**/.LSOverride
+**/Icon[]
