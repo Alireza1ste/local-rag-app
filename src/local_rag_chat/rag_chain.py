@@ -49,23 +49,12 @@ def build_rag_chain(
 
 
 def normalize_chat_history(chat_history: list) -> list[ChatMessage]:
-    """Normalize chat history into consistent ChatMessage format.
-    
-    Handles various input formats: ChatMessage objects, dicts, tuples/lists.
-    Filters for valid user/assistant roles and non-empty content.
-    
-    Args:
-        chat_history: Chat history in any supported format.
-    
-    Returns:
-        List of ChatMessage objects.
-    """
+    """Normalize chat history into consistent ChatMessage format."""
     normalized: list[ChatMessage] = []
 
     for entry in chat_history or []:
         try:
             if hasattr(entry, "role") and hasattr(entry, "content"):
-                # Handle ChatMessage-like objects
                 msg = ChatMessage(
                     role=str(entry.role).lower().strip(),
                     content=str(entry.content).strip(),
@@ -73,7 +62,6 @@ def normalize_chat_history(chat_history: list) -> list[ChatMessage]:
                 if msg.role in {"user", "assistant"} and msg.content:
                     normalized.append(msg)
             elif isinstance(entry, dict) and "role" in entry and "content" in entry:
-                # Handle dictionary format
                 msg = ChatMessage(
                     role=str(entry["role"]).lower().strip(),
                     content=str(entry["content"]).strip(),
@@ -81,7 +69,6 @@ def normalize_chat_history(chat_history: list) -> list[ChatMessage]:
                 if msg.role in {"user", "assistant"} and msg.content:
                     normalized.append(msg)
             elif isinstance(entry, (list, tuple)) and len(entry) >= 1:
-                # Handle tuple format (user, assistant) pairs
                 if entry[0]:
                     normalized.append(ChatMessage(role="user", content=str(entry[0]).strip()))
                 if len(entry) >= 2 and entry[1]:
@@ -95,18 +82,7 @@ def normalize_chat_history(chat_history: list) -> list[ChatMessage]:
 
 
 def condense_question(history: list, message: str) -> str:
-    """Condense current question using chat history context.
-    
-    If message contains pronouns, replaces them with recent context.
-    Otherwise, appends context from previous turns.
-    
-    Args:
-        history: Chat message history.
-        message: Current user message.
-    
-    Returns:
-        Condensed question string.
-    """
+    """Condense current question using chat history context."""
     if not message or not message.strip():
         return ""
 
@@ -114,7 +90,6 @@ def condense_question(history: list, message: str) -> str:
     normalized = normalize_chat_history(history)
     candidate: Optional[str] = None
 
-    # Find previous user question
     for turn in reversed(normalized):
         if turn.role != "user":
             continue
@@ -123,19 +98,15 @@ def condense_question(history: list, message: str) -> str:
             candidate = text
             break
 
-    # If no user question, find previous assistant response
     if not candidate:
         for turn in reversed(normalized):
             if turn.role == "assistant":
                 candidate = turn.content.split("\n")[0][:200].strip(" .")
                 break
 
-    # Replace pronouns if needed
     if candidate and PRONOUN_PATTERN.search(message):
         condensed = replace_pronouns_with_context(message, candidate)
     else:
         condensed = f"{message} (context: {candidate})" if candidate else message
 
     return " ".join(condensed.split())
-
-

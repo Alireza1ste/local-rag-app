@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "local-rag-chat"
-version = "0.2.9"
+version = "0.3.1"
 authors = [
     { name="Dr. Alireza Bayat", email="dr.bayat.alireza@gmail.com" }
 ]
@@ -21,14 +21,13 @@ dependencies = [
     "python-dotenv",
     "langchain-core",
     "langchain-community",
-    "langchain-text-splitters",
     "langchain-qdrant",
     "langchain-ollama",
     "qdrant-client",
-    "pytesseract",
     "pymupdf",
     "pymupdf4llm",
     "fastembed",
+    "Pillow",
 ]
 
 [project.scripts]

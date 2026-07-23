@@ -2,11 +2,10 @@ gradio>=4.0.0
 python-dotenv
 langchain-core
 langchain-community
-langchain-text-splitters
 langchain-qdrant
 langchain-ollama
 qdrant-client
-pytesseract
 pymupdf
 pymupdf4llm
 fastembed
+Pillow

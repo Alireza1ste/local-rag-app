@@ -9,7 +9,6 @@ from langchain_qdrant import QdrantVectorStore
 from .document_processor import (
     create_vectorstore,
     load_documents_from_uploads,
-    split_documents,
 )
 from .rag_chain import build_rag_chain, condense_question, normalize_chat_history
 from .utils import build_llm, create_retriever
@@ -34,15 +33,11 @@ def process_uploaded_documents(
         if not raw_documents:
             return None, "❌ Es konnten keine Inhalte aus den Dateien extrahiert werden."
 
-        documents = split_documents(raw_documents)
-
-        if not documents:
-            return None, "❌ Es konnten keine Textblöcke erzeugt werden."
-
-        vectorstore = create_vectorstore(documents)
+        # Pass whole pages directly to the vector store
+        vectorstore = create_vectorstore(raw_documents)
         return (
             vectorstore,
-            f"✅ Erfolgreich verarbeitet: {len(documents)} Textblöcke bereit für Anfragen.",
+            f"✅ Erfolgreich verarbeitet: {len(raw_documents)} vollständige Seiten bereit für Anfragen.",
         )
 
     except Exception as exc:
@@ -91,8 +86,9 @@ def handle_query(
             answer = chain_res
             sources = retriever.invoke(condensed)
 
-        source_text = "\n\n".join(
-            f"{idx}. {doc.page_content[:400].replace(chr(10), ' ')}..."
+        # Display full untruncated sources
+        source_text = "\n\n---\n\n".join(
+            f"### Source {idx}\n{doc.page_content}"
             for idx, doc in enumerate(sources, 1)
         )
 
@@ -140,7 +136,7 @@ def build_interface() -> gr.Blocks:
             k = gr.Slider(minimum=1, maximum=1000, value=20, step=1, label="k")
             fetch_k = gr.Slider(minimum=1, maximum=2000, value=50, step=1, label="fetch_k")
             score_threshold = gr.Slider(
-                minimum=0.0, maximum=1.0, value=0.6, step=0.05, label="score_threshold"
+                minimum=0.0, maximum=1.0, value=0.0, step=0.01, label="score_threshold"
             )
             search_type = gr.Dropdown(
                 ["similarity", "mmr", "similarity_score_threshold"],
@@ -154,7 +150,6 @@ def build_interface() -> gr.Blocks:
             answer_output = gr.Textbox(label="Antwort", lines=10)
             source_output = gr.Textbox(label="Quellen", lines=10)
 
-        # Include enable_vision in the inputs
         process_btn.click(
             fn=process_uploaded_documents,
             inputs=[files, enable_vision],

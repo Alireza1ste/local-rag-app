@@ -15,7 +15,6 @@ from langchain_core.documents import Document
 from langchain_core.messages import HumanMessage
 from langchain_ollama import ChatOllama
 from langchain_qdrant import FastEmbedSparse, QdrantVectorStore, RetrievalMode
-from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 from .models import EmbeddingsConfig, VectorstoreConfig
 from .utils import build_embeddings
@@ -134,7 +133,6 @@ def extract_primary_subject(text: str, fallback_filename: str) -> str:
     """Extract prominent names or titles from text to contextualize visual descriptions."""
     matches = re.findall(r"(?:Dr\.|Prof\.|Mr\.|Ms\.)?\s*[A-Z][a-z]+\s+[A-Z][a-z]+", text)
     if matches:
-        # Pick the most common name or top heading match
         return matches[0]
     return fallback_filename.rsplit(".", 1)[0].replace("_", " ").title()
 
@@ -168,14 +166,10 @@ def load_documents_from_uploads(
             elif ext == ".pdf":
                 print(f"📝 Extracting markdown from {path.name}...")
                 
-                # Get layout-aware markdown page-by-page
                 page_chunks = pymupdf4llm.to_markdown(str(path), page_chunks=True)
-                
-                # Extract full text to identify overall subject name
                 full_doc_text = " ".join(chunk["text"] for chunk in page_chunks)
                 primary_subject = extract_primary_subject(full_doc_text, path.name)
 
-                # Conditionally run vision analysis based on UI toggle
                 visual_analyses = {}
                 if enable_vision:
                     visual_analyses = get_pdf_page_visual_analyses(str(path))
@@ -186,7 +180,6 @@ def load_documents_from_uploads(
                     page_num = chunk["metadata"]["page_number"] - 1  # 0-based index
                     page_text = chunk["text"].strip()
 
-                    # Extract first non-empty line as page header
                     page_header = ""
                     for line in page_text.split("\n"):
                         clean_line = line.strip("# ").strip()
@@ -196,7 +189,6 @@ def load_documents_from_uploads(
                     if not page_header:
                         page_header = f"{primary_subject} - Page {page_num + 1}"
 
-                    # Prepend visual analysis directly tied to primary subject and page header
                     if page_num in visual_analyses and visual_analyses[page_num]:
                         contextualized_visuals = [
                             f"[Visual Analysis for Subject '{primary_subject}' (Page Context: {page_header})]: {va}"
@@ -232,22 +224,6 @@ def load_documents_from_uploads(
             print(f"❌ Error loading {path.name}: {e}")
 
     return documents
-
-
-def split_documents(
-    documents: list[Document],
-    config: VectorstoreConfig | None = None,
-) -> list[Document]:
-    """Split documents into chunks using recursive text splitter."""
-    if not documents:
-        return []
-
-    cfg = config or VectorstoreConfig()
-    splitter = RecursiveCharacterTextSplitter(
-        chunk_size=cfg.chunk_size,
-        chunk_overlap=cfg.chunk_overlap,
-    )
-    return splitter.split_documents(documents)
 
 
 def create_vectorstore(

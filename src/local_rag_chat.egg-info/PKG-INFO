@@ -1,6 +1,6 @@
 Metadata-Version: 2.4
 Name: local-rag-chat
-Version: 0.2.9
+Version: 0.3.1
 Summary: A completely local RAG application using Gradio, LangChain, Qdrant, and Ollama
 Author-email: "Dr. Alireza Bayat" <dr.bayat.alireza@gmail.com>
 Classifier: Programming Language :: Python :: 3
@@ -12,19 +12,45 @@ Requires-Dist: gradio>=4.0.0
 Requires-Dist: python-dotenv
 Requires-Dist: langchain-core
 Requires-Dist: langchain-community
-Requires-Dist: langchain-text-splitters
 Requires-Dist: langchain-qdrant
 Requires-Dist: langchain-ollama
 Requires-Dist: qdrant-client
-Requires-Dist: pytesseract
 Requires-Dist: pymupdf
 Requires-Dist: pymupdf4llm
 Requires-Dist: fastembed
+Requires-Dist: Pillow
 
 # Local RAG Chat
 
-A fully local RAG pipeline with a Gradio UI, using LangChain, Qdrant in-memory vector store, and Ollama.
+A 100% local, privacy-focused Retrieval-Augmented Generation (RAG) application built with **Gradio**, **LangChain**, **Qdrant**, and **Ollama**.
 
-## Installation
+Extract content from PDFs (with optional multi-modal vision analysis for charts, formulas, schematics, and portraits) and TXT files, store vectors in memory using hybrid search, and chat with your documents completely offline.
+
+---
+
+## ✨ Key Features
+
+* **100% Local & Private**: No API keys or cloud services required. Everything runs locally via Ollama and an in-memory Qdrant vector store.
+* **Multi-Modal Vision Analysis**: Toggle Vision OCR to analyze images, patent drawings, mathematical formulas, schematics, and graphs embedded within PDFs.
+* **Markdown Page Parsing**: Uses `pymupdf4llm` to convert PDF layouts into structured, LLM-friendly markdown documents.
+* **Hybrid Search Retrieval**: Combines dense vector embeddings (`embeddinggemma`) with sparse BM25 text search (`FastEmbedSparse`) for high-accuracy retrieval.
+* **Interactive Gradio UI**:
+  * Customizable system roles and prompts.
+  * Adjust retrieval parameters on the fly (`k`, `fetch_k`, `score_threshold`, search algorithms).
+  * Transparent document reference viewer to inspect complete retrieved text chunks without truncation.
+* **Thinking Mode Support**: Pre-configured system prompt with `<|think|>` support for compatible models like `gemma4:26b`.
+
+---
+
+## 📋 Prerequisites
+
+1. **Python**: Python 3.9 or higher.
+2. **Ollama**: Download and install [Ollama](https://ollama.com/).
+3. **Ollama Models**: Pull the required default models before launching:
+
 ```bash
-pip install --index-url [https://test.pypi.org/simple/](https://test.pypi.org/simple/) local-rag-chat
+# Main LLM / Vision model
+ollama pull gemma4:26b
+
+# Embedding model
+ollama pull embeddinggemma
