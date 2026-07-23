@@ -22,7 +22,11 @@ PRONOUN_PATTERN = re.compile(
 def build_llm(config: LLMConfig | None = None) -> ChatOllama:
     """Initialize and return a ChatOllama LLM instance."""
     cfg = config or LLMConfig()
-    return ChatOllama(model=cfg.model_name, temperature=cfg.temperature)
+    return ChatOllama(
+        model=cfg.model_name, 
+        temperature=cfg.temperature,
+        reasoning=True
+    )
 
 
 def build_embeddings(model_name: str = "embeddinggemma") -> OllamaEmbeddings:
@@ -34,7 +38,7 @@ def build_system_prompt(role: str, default_role: str = "You are a patent attorne
     """Build a system prompt for the RAG chain."""
     selected_role = role.strip() or default_role
     return (
-        f"<|think|> {selected_role}. Use the following context to answer the question. "
+        f"{selected_role}. Use the following context to answer the question. "
         "Pay close attention to specific reference numerals (e.g., 56, Fig. 2) and technical descriptions. "
         "If the context does not contain relevant information, say: "
         "'This information is not contained in my documents.' "

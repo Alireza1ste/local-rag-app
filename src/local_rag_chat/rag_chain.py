@@ -5,7 +5,7 @@ from operator import itemgetter
 from typing import Optional
 
 from langchain_core.language_models import BaseLanguageModel
-from langchain_core.output_parsers import StrOutputParser
+from langchain_core.messages import AIMessage
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.runnables import Runnable, RunnablePassthrough
 
@@ -17,6 +17,16 @@ from .utils import (
     format_documents,
     replace_pronouns_with_context,
 )
+
+
+def parse_reasoning_and_content(msg: AIMessage) -> str:
+    """Extracts both the reasoning blocks and the final answer from ChatOllama."""
+    content = msg.content
+    reasoning = msg.additional_kwargs.get("reasoning_content", "")
+    
+    if reasoning:
+        return f"🤔 **Thinking Process:**\n{reasoning}\n\n---\n\n✅ **Answer:**\n{content}"
+    return content
 
 
 def build_rag_chain(
@@ -43,7 +53,7 @@ def build_rag_chain(
             }
             | prompt
             | llm
-            | StrOutputParser()
+            | parse_reasoning_and_content
         )
     )
 

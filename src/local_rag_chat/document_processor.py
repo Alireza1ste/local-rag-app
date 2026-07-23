@@ -209,6 +209,10 @@ def load_documents_from_uploads(
                             f"{page_text}"
                         )
 
+                    # Extract figure references for patent mapping
+                    figure_matches = re.findall(r"(?:Fig\.|Figure)\s*\d+[a-zA-Z]?", page_text, re.IGNORECASE)
+                    unique_figures = list(set(figure_matches))
+
                     raw_documents.append(
                         Document(
                             page_content=page_text,
@@ -218,6 +222,7 @@ def load_documents_from_uploads(
                                 "primary_subject": primary_subject,
                                 "page": page_num,
                                 "type": "page_markdown_combined",
+                                "figures": unique_figures,
                             },
                         )
                     )

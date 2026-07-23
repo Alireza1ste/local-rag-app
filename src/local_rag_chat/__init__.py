@@ -1,6 +1,6 @@
 """Local RAG Chat - A completely local RAG application using Gradio, LangChain, Qdrant, and Ollama."""
 
-__version__ = "0.3.2"
+__version__ = "0.3.3"
 __author__ = "Dr. Alireza Bayat"
 __email__ = "dr.bayat.alireza@gmail.com"
 
